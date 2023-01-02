@@ -1,0 +1,203 @@
+Hệ thống bán hàng
+
+1. Xử lý luồng đăng nhập/đăng ký tài khoản khách hàng
+2. Có sẵn 1 tài khoản quản trị
+3. Quản trị viên có thể thêm/sửa/xóa sản phẩm bày bán
+4. Quản trị viên có thể theo dõi các hóa đơn đã đặt của khách hàng
+5. Quản trị viên truy vấn được thống kê của cửa hàng (top 10 sản phẩm bán chạy trong tháng, tổng doanh thu của tháng, số lượng đơn đã đặt trong tháng)
+
+6. Khách hàng có thể xem danh sách sản phẩm, filter được theo tên, giá cả, loại sản phẩm
+7. Khách hàng có thể cho sản phẩm vào giỏ hàng, thanh toán hóa đơn
+8. Khách hàng có thể xem các hóa đơn đã đặt ở trên hệ thống
+
+BE: sử dụng ASP.NET Core để viết API, dùng EntityFramework Core truy vấn database
+FE: có thể dùng C# MVC, html/css/js thuần hoặc framework frontend như Angular/Reactjs
+
+Scaffold-DbContext "Data Source=QUYET-PC\SQLEXPRESS;Initial Catalog=Qapp_API;Integrated Security=True;TrustServerCertificate=true;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -force
+Microsoft.EntityFrameworkCore.Design
+Microsoft.EntityFrameworkCore.SqlServer
+Microsoft.EntityFrameworkCore.Tools
+Microsoft.AspNetCore.Authentication.JwtBearer
+
+
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { AfterViewInit, Component, Injector, OnInit } from '@angular/core';
+import { BaseComponent } from '../../../core/common/base-component';
+import MatchValidation from '../../../core/helpers/must-match.validator';
+declare var $: any;
+
+@Component({
+  selector: 'app-manage-all-danhmuc',
+  templateUrl: './manage-all-danhmuc.component.html',
+  styleUrls: ['./manage-all-danhmuc.component.css']
+})
+export class ManageAllDanhmucComponent extends BaseComponent implements OnInit, AfterViewInit {
+  public list_danhmuc: any;
+  public isCreate = false;
+  public user: any;
+  public frmDanhMuc: FormGroup;
+  public frmSearch: FormGroup;
+  public Role: string = 'Admin';
+  public file: any;
+  public showUpdateModal: any;
+  public doneSetupForm: any;
+
+  public loc:any;
+  public page: any = 1;
+  public id: any;
+  public pageSize: any = 3;
+  public list_item: any;
+  public totalItem: any;
+
+  constructor(injector: Injector) {
+    super(injector);
+    this.frmSearch = new FormGroup({
+      'txt_madanhmuc': new FormControl('', []),
+
+    });
+  }
+
+  ngOnInit(): void {
+    this.loc = localStorage.getItem('loc') || '';
+    this._route.params.subscribe(params => {
+      this.id = params['id'];
+      this._api.post('/api/DanhMuc/SearchGetAll',  { loc: this.loc, page: this.page, pageSize: this.pageSize, ma_danh_muc: this.id }).subscribe(res => {
+        this.list_item = res.data;
+        this.totalItem = res.totalItem;
+
+        setTimeout(() => {
+          this.loadScripts(
+            'assets/dist/js/adminlte.min.js','assets/dist/js/demo.js',
+          );
+        });
+      });
+
+    });
+    this.LoadData();
+  }
+  public LoadData() {
+    this._api.post('/api/DanhMuc/SearchGetAll', { loc: this.loc, page: this.page, pageSize: this.pageSize,ma_danh_muc: this.frmSearch.value['txt_madanhmuc']}).subscribe(res => {
+      this.list_danhmuc = res.data;
+      this.totalItem = res.totalItem;
+      console.log(this.list_danhmuc);
+      console.log(res.totalItem);
+      setTimeout(() => {
+        this.loadScripts(
+          'assets/dist/js/adminlte.min.js','assets/dist/js/demo.js',
+        );
+      });
+    });
+  }
+  ngAfterViewInit() {
+    this.loadScripts('');
+  }
+  get tenDanhMuc() {
+    return this.frmDanhMuc.get('txt_tendanhmuc')!;
+  }
+  get stt() {
+    return this.frmDanhMuc.get('txt_stt')!;
+  }
+
+  get trangThai() {
+    return this.frmDanhMuc.get('txt_trangthai')!;
+  }
+
+  public createModal() {
+    this.showUpdateModal = true;
+    this.isCreate = true;
+    setTimeout(() => {
+      $('#createUserModal').modal('toggle');
+      this.frmDanhMuc = new FormGroup({
+        'txt_tendanhmuc': new FormControl('', [Validators.required, Validators.minLength(3), Validators.maxLength(250)]),
+        //'txt_trangthai': new FormControl('', [Validators.required]),
+        //'txt_stt': new FormControl('', [Validators.required]),
+      }, {
+      });
+      this.doneSetupForm = true;
+
+    });
+  }
+
+
+  public openUpdateModal(maDanhMuc: any) {
+    console.log(maDanhMuc);
+
+    this.showUpdateModal = true;
+    this.doneSetupForm = false;
+    this.isCreate = false;
+    setTimeout(() => {
+      $('#createUserModal').modal('toggle');
+      this._api.get('/api/DanhMuc/get-by-id/' + maDanhMuc).subscribe(res => {
+        console.log(res);
+
+        this.user = res;
+        console.log(res);
+
+        this.frmDanhMuc = new FormGroup({
+          'txt_tendanhmuc': new FormControl(this.user.tenDanhMuc, [Validators.required, Validators.minLength(3), Validators.maxLength(250)]),
+        }, {
+        });
+        this.doneSetupForm = true;
+      });
+    });
+  }
+
+  public onRemove(maDanhMuc: any) {
+    this._api.delete('/api/DanhMuc/delete-user', maDanhMuc).subscribe(res => {
+      alert('Xóa dữ liệu thành công');
+      this.LoadData();
+    });
+  }
+  public closeModal() {
+    $('#createUserModal').closest('.modal').modal('hide');
+  }
+
+
+  public findInvalidControls() {
+    const invalid = [];
+    const controls = this.frmDanhMuc.controls;
+    for (const name in controls) {
+      if (controls[name].invalid) {
+        invalid.push(name);
+      }
+    }
+    return invalid;
+  }
+  OnSubmit(dm: any) {
+    console.log(this.findInvalidControls())
+    if (this.frmDanhMuc.invalid) {
+      return;
+    }
+    let obj: any = {};
+    obj.DanhMuc = {
+      tenDanhMuc: dm.txt_tendanhmuc,
+      stt: 1,
+      trangThai: true,
+    }
+    console.log(obj.DanhMuc);
+    if (this.isCreate) {
+      this._api.post('/api/DanhMuc/create-user', obj.DanhMuc).subscribe(res => {
+        if (res && res.data) {
+          console.log(res.data);
+          alert('Thêm dữ liệu thành công');
+          this.LoadData();
+          this.closeModal();
+        } else {
+          alert('Có lỗi')
+        }
+      });
+    } else {
+      obj.DanhMuc.maDanhMuc = this.user.maDanhMuc;
+      console.log(this.user.maDanhMuc);
+      this._api.post('/api/DanhMuc/update-user', obj.DanhMuc).subscribe(res => {
+        if (res && res.data) {
+          alert('Cập nhật dữ liệu thành công');
+          this.LoadData();
+          this.closeModal();
+        } else {
+          alert('Có lỗi')
+        }
+      });
+    }
+  }
+}
